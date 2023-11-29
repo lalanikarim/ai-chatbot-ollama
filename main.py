@@ -13,7 +13,7 @@ system_prompt = st.text_area(
         value="You are a helpful AI assistant who answers questions in short sentences."
         )
 
-llm = Ollama(model="mistral")
+llm = Ollama(model="mistral", base_url="http://localhost:11434")
 
 prompt = PromptTemplate.from_template(
         template="""<s>[INST]{system_prompt}[/INST]
