@@ -15,7 +15,8 @@ license: mit
 Run your own AI Chatbot locally on a GPU or even a CPU.
 
 To make that possible, we use the [Mistral 7b](https://mistral.ai/news/announcing-mistral-7b/) model.  
-However, you can use any quantized model that is supported by [llama.cpp](https://github.com/ggerganov/llama.cpp).
+We will run use an LLM inference engine called [Ollama](https://ollama.ai) to run our LLM and to serve  
+an inference api endpoint and have LangChain connect to it instead of running the LLM directly.
 
 This AI chatbot will allow you to define its personality and respond to the questions accordingly.  
 There is no chat memory in this iteration, so you won't be able to ask follow-up questions.
@@ -33,24 +34,28 @@ The chatbot will essentially behave like a Question/Answer bot.
 The setup assumes you have `python` already installed and `venv` module available.
 
 1. Install `ollama` from [ollama.ai](https://ollama.ai).
-2. Download `mistral` llm using `ollama`:
+2. Start `ollama`:
+```bash
+ollama serve
+```
+3. Download `mistral` llm using `ollama`:
 ```bash
 ollama pull mistral
 ```
-3. Download the code or clone the repository.
-4. Inside the root folder of the repository, initialize a python virtual environment:
+4. Download the code or clone the repository.
+5. Inside the root folder of the repository, initialize a python virtual environment:
 ```bash
 python -m venv .venv
 ```
-5. Activate the python environment:
+6. Activate the python environment:
 ```bash
 source .venv/bin/activate
 ```
-6. Install required packages (`langchain` and `streamlit`):
+7. Install required packages (`langchain` and `streamlit`):
 ```bash
 pip install -r requirements.txt
 ```
-7. Start `streamlit`:
+8. Start `streamlit`:
 ```bash
 streamlit run main.py
 ```
