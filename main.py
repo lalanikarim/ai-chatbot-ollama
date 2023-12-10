@@ -1,52 +1,64 @@
+from langchain.callbacks.base import BaseCallbackHandler
+from langchain.chat_models import ChatOllama
+from langchain.schema import HumanMessage, AIMessage
+import urllib.request, json
 import streamlit as st
-from langchain.llms.ollama import Ollama
-from langchain_core.prompts.prompt import PromptTemplate
 
-st.set_page_config(
-        page_title="LangChain + Ollama + Streamlit"
-        )
+@st.cache_resource
+def get_ollama_models(ollama_server_url):
+    api_tags = "/api/tags"
+    models = []
+    with urllib.request.urlopen(ollama_server_url + api_tags) as tags:
+        response = json.load(tags)
+        models = [model['name'] for model in response['models']]
 
-st.header("LangChain + Ollama + Streamlit")
+        # This is not necessary but added here to keep the output clean
+        models = [model.replace(":latest","") for model in models]
+    return tuple(models)
 
-system_prompt = st.text_area(
-        label="System Prompt",
-        value="You are a helpful AI assistant who answers questions in short sentences."
-        )
+class StreamHandler(BaseCallbackHandler):
+    def __init__(self, container, initial_text=""):
+        self.container = container
+        self.text = initial_text
 
-llm = Ollama(model="mistral", base_url="http://localhost:11434")
+    def on_llm_new_token(self, token: str, **kwargs) -> None:
+        self.text += token
+        self.container.markdown(self.text)
 
-prompt = PromptTemplate.from_template(
-        template="""<s>[INST]{system_prompt}[/INST]
-        [INST]{question}[/INST]
-        """,
-        partial_variables={"system_prompt": system_prompt}
-        )
+st.title("LangChain + Streamlit + Ollama")
 
-chain = prompt | llm
+with st.sidebar:
+    # Url of the hosted ollama instance.
+    ollama_server = st.text_input("Ollama API Server", value="http://localhost:11434")
+    ollama_model = st.selectbox("Ollama model name", get_ollama_models(ollama_server), index=None)
+    
+    st.markdown("""
+    Changing the model doesn't clear the history which gets passed to the new llm as context.  
+    Use the below button to clear chat history and start with a clear slate.
+    """)
+    if st.button("Clear chat history", type="primary"):
+        st.session_state["messages"] = [AIMessage(content="How can I help you?")]
+
 
 if "messages" not in st.session_state:
-    st.session_state.messages = [
-            {"role": "assistant", "content": "How may I help you today?"}
-            ]
+    st.session_state["messages"] = [AIMessage(content="How can I help you?")]
 
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
+for msg in st.session_state.messages:
+    st.chat_message(msg.type).write(msg.content)
 
-if question := st.chat_input("Your message here"):
+if prompt := st.chat_input():
+    st.session_state.messages.append(HumanMessage(content=prompt))
+    st.chat_message("user").write(prompt)
 
-    st.session_state.messages.append(
-            {"role": "human", "content": question}
-            )
-
-    with st.chat_message("user"):
-        st.markdown(question)
-
-    response = chain.invoke({"question": question})
-
-    st.session_state.messages.append(
-            {"role": "assistant", "content": response}
-            )
+    if not ollama_model:
+        st.info("""Please select an existing Ollama model name to continue.
+        Visit https://ollama.ai/library for a list of supported models.
+        Restart the streamlit app after downloading a model using the `ollama pull <model_name>` command.
+        It should become available in the list of available models.""")
+        st.stop()
 
     with st.chat_message("assistant"):
-        st.markdown(response)
+        stream_handler = StreamHandler(st.empty())
+        llm = ChatOllama(model=ollama_model, streaming=True, callbacks=[stream_handler])
+        response = llm(st.session_state.messages)
+        st.session_state.messages.append(AIMessage(content=response.content))
